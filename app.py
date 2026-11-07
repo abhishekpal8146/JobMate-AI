@@ -901,14 +901,36 @@ elif page == "Job Recommendations":
 
         except Exception as e:
             st.error(f"Something went wrong: {e}")
+
 elif page == "About":
     st.title("About JobMate AI")
-    st.write("""
-    JobMate AI is an intelligent career assistant designed
-    to help job seekers improve their resumes and find better
-    job opportunities.
 
-    Our goal is to make career preparation smarter,
-    simpler and more accessible.
+    st.write("""
+    JobMate AI is a career assistance web application designed
+    to help job seekers analyze their resumes, identify skill gaps,
+    improve their profiles, and explore suitable job opportunities.
+
+    Our goal is to make career preparation smarter, simpler,
+    and more accessible.
     """)
-    st.info("Built with Python and Streamlit.")
+
+    st.subheader("What We Offer")
+
+    st.markdown("""
+    - 📄 Resume Analysis and ATS-Style Match Scoring
+    - 🎯 Required and Preferred Skill Detection
+    - 📊 Skill Gap Analysis and Improvement Suggestions
+    - 🗺️ Personalized Learning Roadmap
+    - 📝 Resume Builder with PDF Download
+    - 💼 Skill-Based Job Recommendations
+    """)
+
+    st.subheader("Technology Stack")
+
+    st.write("Built using Python, Streamlit, PyPDF, and ReportLab.")
+
+    st.info(
+        "Our Mission: To empower job seekers with useful insights "
+        "and practical tools for their career growth."
+    )
+
