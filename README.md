@@ -1,4 +1,6 @@
 # 💼 JobMate AI
+🌐 **Live Demo:** https://jobmate-ai-abhishek.streamlit.app
+💻 **GitHub Repository:** https://github.com/abhishekpal8146/JobMate-AI
 
 **An AI-powered Resume Analyzer and Career Assistant built with Python and Streamlit.**
 
