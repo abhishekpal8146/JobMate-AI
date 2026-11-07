@@ -50,7 +50,7 @@ JobMate AI helps job seekers analyze their resumes, identify skill gaps, improve
 4. Activate the virtual environment (Windows):
 
    ```bash
-   Scripts\activate
+  venv\Scripts\activate
    ```
 
 5. Install dependencies:
@@ -74,7 +74,6 @@ JobMate-AI/
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
-└── venv/
 ```
 
 ## 📌 Important Note
