@@ -1,7 +1,7 @@
 # 💼 JobMate AI
-🌐 **Live Demo:** https://jobmate-ai-abhishek.streamlit.app
+🌐 **Live Demo:** [JobMate AI](https://jobmate-ai-abhishek.streamlit.app)
 
-💻 **GitHub Repository:** https://github.com/abhishekpal8146/JobMate-AI
+💻 **GitHub Repository:** [JobMate AI](https://github.com/abhishekpal8146/JobMate-AI)
 
 **An AI-powered Resume Analyzer and Career Assistant built with Python and Streamlit.**
 
@@ -29,41 +29,42 @@ JobMate AI helps job seekers analyze their resumes, identify skill gaps, improve
 
 ## ⚙️ Installation and Setup
 
-1. Clone the repository:
+1. **Clone the repository:**
 
    ```bash
    git clone https://github.com/abhishekpal8146/JobMate-AI.git
    ```
 
-2. Open the project directory:
+2. **Navigate the project directory:**
 
    ```bash
    cd JobMate-AI
    ```
 
-3. Create a virtual environment:
+3. **Create a virtual environment:**
 
    ```bash
    python -m venv venv
    ```
 
-4. Activate the virtual environment (Windows):
+4. **Activate the virtual environment (Windows):**
 
    ```bash
    venv\Scripts\activate
    ```
 
-5. Install dependencies:
+5. **Install dependencies:**
 
    ```bash
    pip install -r requirements.txt
    ```
 
-6. Run the application:
+6. **Run the application:**
 
    ```bash
    streamlit run app.py
    ```
+   
 ## 📂 Project Structure
 
 ```text
@@ -74,6 +75,20 @@ JobMate-AI/
 ├── README.md
 ├── .gitignore
 ```
+
+## 📸 Project Screenshots
+
+### Dashboard
+![Dashboard](screenshots/Dashboard.png)
+
+### Resume Analyzer
+![Resume Analyzer](screenshots/resume_analyzer.png)
+
+### Resume Builder
+![Resume Builder](screenshots/resume_builder.png)
+
+### Job Recommendations
+![Job Recommendations](screenshots/job_recommendations.png)
 
 ## 📌 Important Note
 
