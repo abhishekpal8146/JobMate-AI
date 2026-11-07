@@ -64,7 +64,6 @@ JobMate AI helps job seekers analyze their resumes, identify skill gaps, improve
    ```bash
    streamlit run app.py
    ```
-
 ## 📂 Project Structure
 
 ```text
