@@ -32,7 +32,7 @@ JobMate AI helps job seekers analyze their resumes, identify skill gaps, improve
 1. Clone the repository:
 
    ```bash
-   git clone YOUR_GITHUB_REPOSITORY_URL
+   git clone https://github.com/abhishekpal8146/JobMate-AI.git
    ```
 
 2. Open the project directory:
