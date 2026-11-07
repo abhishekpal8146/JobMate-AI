@@ -324,7 +324,10 @@ def analyze_resume(resume, job_description):
         "technical_score": percentage(
             technical_matched, technical_total
         ),
-        "soft_score": percentage(soft_matched, soft_total)
+        "soft_score": percentage(soft_matched, soft_total),
+        "jd_skills_found": bool(required_skills or preferred_skills),
+        "technical_applicable": bool(technical_total),
+        "soft_applicable": bool(soft_total)
     }
 SKILL_GROUPS = {
     "Testing Fundamentals": [
@@ -599,18 +602,37 @@ elif page == "Resume Analyzer":
 
         col1, col2, col3 = st.columns(3)
 
-        col1.metric("Overall Match", f"{results['score']}%")
-        col2.metric("Technical Score", f"{results['technical_score']}%")
-        col3.metric("Soft Skills Score", f"{results['soft_score']}%")
+        overall_display = (
+            f"{results['score']}%" if results["jd_skills_found"] else "N/A"
+        )
+        technical_display = (
+            f"{results['technical_score']}%"
+            if results["technical_applicable"] else "N/A"
+        )
+        soft_display = (
+            f"{results['soft_score']}%"
+            if results["soft_applicable"] else "N/A"
+        )
+
+        col1.metric("Overall Match", overall_display)
+        col2.metric("Technical Score", technical_display)
+        col3.metric("Soft Skills Score", soft_display)
 
         st.progress(results["score"] / 100)
 
-        if results["score"] >= 75:
-            st.success("Strong keyword match!")
-        elif results["score"] >= 40:
-            st.warning("Moderate match. Some improvements needed.")
+        if not results["jd_skills_found"]:
+            st.warning(
+                "No recognizable skills were detected in the job "
+                "description. The match score is unavailable — "
+                "make sure the JD lists concrete skills."
+            )
         else:
-            st.error("Low match. Consider improving your skill alignment.")
+            if results["score"] >= 75:
+                st.success("Strong keyword match!")
+            elif results["score"] >= 40:
+                st.warning("Moderate match. Some improvements needed.")
+            else:
+                st.error("Low match. Consider improving your skill alignment.")
 
         st.subheader("🎯 Required Skills")
         st.write("✅ Matched:")
@@ -648,7 +670,7 @@ elif page == "Resume Analyzer":
 
                     st.info(CATEGORY_TIPS[category])
 
-        if not gap_found:
+        if not gap_found and results["jd_skills_found"]:
             st.success(
                 "🎉 No skill gaps detected! "
                 "Your resume matches all detected skills."
