@@ -565,6 +565,8 @@ elif page == "Resume Analyzer":
         placeholder="Paste the job requirements here..."
     )
 
+    st.session_state.setdefault("analyzer_results", None)
+
     if st.button("Analyze My Resume", type="primary"):
         if uploaded_file is None:
             st.error("Please upload your PDF resume.")
@@ -584,139 +586,144 @@ elif page == "Resume Analyzer":
                         results = analyze_resume(
                             resume_text, job_description
                         )
+                        st.session_state["analyzer_results"] = results
 
-                        st.divider()
-                        st.subheader("📊 Intelligent ATS Analysis")
-
-                        col1, col2, col3 = st.columns(3)
-
-                        col1.metric("Overall Match", f"{results['score']}%")
-                        col2.metric("Technical Score", f"{results['technical_score']}%")
-                        col3.metric("Soft Skills Score", f"{results['soft_score']}%")
-
-                        st.progress(results["score"] / 100)
-
-                        if results["score"] >= 75:
-                            st.success("Strong keyword match!")
-                        elif results["score"] >= 40:
-                            st.warning("Moderate match. Some improvements needed.")
-                        else:
-                            st.error("Low match. Consider improving your skill alignment.")
-
-                        st.subheader("🎯 Required Skills")
-                        st.write("✅ Matched:")
-                        st.write(", ".join(results["required_matched"]) or "None")
-
-                        st.write("⚠️ Missing:")
-                        st.write(", ".join(results["required_missing"]) or "None")
-
-                        st.subheader("⭐ Preferred Skills")
-                        st.write("✅ Matched:")
-                        st.write(", ".join(results["preferred_matched"]) or "None")
-
-                        st.write("⚠️ Missing:")
-                        st.write(", ".join(results["preferred_missing"]) or "None")
-                        st.subheader("🧠 Smart Skill Gap Analysis")
-
-                        missing_skills = set(results["missing"])
-                        gap_found = False
-
-                        for category, skills in SKILL_GROUPS.items():
-                            category_gaps = [
-                                skill for skill in skills
-                                if skill in missing_skills
-                            ]
-
-                            if category_gaps:
-                                gap_found = True
-
-                                with st.expander(
-                                    f"📌 {category} — "
-                                    f"{len(category_gaps)} missing skills"
-                                ):
-                                    st.write("**Skills to improve:**")
-                                    st.write(", ".join(category_gaps))
-
-                                    st.info(CATEGORY_TIPS[category])
-
-                        if not gap_found:
-                            st.success(
-                                "🎉 No skill gaps detected! "
-                                "Your resume matches all detected skills."
-                            )
-                        st.subheader("📈 ATS Score Improvement Suggestions")
-
-                        all_missing_skills = (
-                            results["required_missing"]
-                            + results["preferred_missing"]
-                        )
-
-                        for skill in all_missing_skills:
-                            tip = SKILL_IMPROVEMENT_TIPS.get(
-                                skill,
-                                f"Learn {skill} and add genuine evidence of it to your resume."
-                            )
-
-                            st.info(f"💡 **{skill.title()}:** {tip}")
-                        st.subheader("🚀 Personalized Recommendations")
-
-                        for skill in results["required_missing"]:
-                            st.warning(
-                                f"Required: Improve or add evidence for **{skill}**."
-                            )
-
-                        for skill in results["preferred_missing"]:
-                            st.info(
-                                f"Preferred: Consider learning **{skill}** "
-                                "for an additional advantage."
-                            )
-                        st.divider()
-                        st.subheader("🗺️ Your Personalized Learning Roadmap")
-
-                        roadmap_found = False
-
-                        for category, skills in SKILL_GROUPS.items():
-                            category_gaps = [
-                                skill for skill in skills
-                                if skill in missing_skills
-                            ]
-
-                            if category_gaps and category in LEARNING_ROADMAP:
-                                roadmap_found = True
-                                roadmap = LEARNING_ROADMAP[category]
-
-                                with st.expander(
-                                    f"📚 {category} | {roadmap['duration']}"
-                                ):
-                                    st.write("**What you should learn:**")
-
-                                    for topic in roadmap["topics"]:
-                                        st.write(f"📌 {topic}")
-
-                                    st.success(
-                                        f"🎯 Practice Task: {roadmap['task']}"
-                                    )
-
-                        if not roadmap_found:
-                            st.success(
-                                "🎉 Great! No learning gaps found. "
-                                "Keep improving your skills!"
-                            )
-                        st.caption(
-                            "This is a weighted keyword-based estimate, "
-                            "not an official ATS score or hiring prediction."
-                        )
-                        pdf_report = generate_pdf_report(results)
-
-                        st.download_button(
-                            label="📥 Download Analysis Report",
-                            data=pdf_report,
-                            file_name="JobMate_AI_Analysis_Report.pdf",
-                            mime="application/pdf"
-                        )
             except Exception as e:
                 st.error(f"Something went wrong: {e}")
-            
+
+    # Render persisted analysis results (survives Streamlit reruns)
+    results = st.session_state.get("analyzer_results")
+    if results:
+        st.divider()
+        st.subheader("📊 Intelligent ATS Analysis")
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Overall Match", f"{results['score']}%")
+        col2.metric("Technical Score", f"{results['technical_score']}%")
+        col3.metric("Soft Skills Score", f"{results['soft_score']}%")
+
+        st.progress(results["score"] / 100)
+
+        if results["score"] >= 75:
+            st.success("Strong keyword match!")
+        elif results["score"] >= 40:
+            st.warning("Moderate match. Some improvements needed.")
+        else:
+            st.error("Low match. Consider improving your skill alignment.")
+
+        st.subheader("🎯 Required Skills")
+        st.write("✅ Matched:")
+        st.write(", ".join(results["required_matched"]) or "None")
+
+        st.write("⚠️ Missing:")
+        st.write(", ".join(results["required_missing"]) or "None")
+
+        st.subheader("⭐ Preferred Skills")
+        st.write("✅ Matched:")
+        st.write(", ".join(results["preferred_matched"]) or "None")
+
+        st.write("⚠️ Missing:")
+        st.write(", ".join(results["preferred_missing"]) or "None")
+        st.subheader("🧠 Smart Skill Gap Analysis")
+
+        missing_skills = set(results["missing"])
+        gap_found = False
+
+        for category, skills in SKILL_GROUPS.items():
+            category_gaps = [
+                skill for skill in skills
+                if skill in missing_skills
+            ]
+
+            if category_gaps:
+                gap_found = True
+
+                with st.expander(
+                    f"📌 {category} — "
+                    f"{len(category_gaps)} missing skills"
+                ):
+                    st.write("**Skills to improve:**")
+                    st.write(", ".join(category_gaps))
+
+                    st.info(CATEGORY_TIPS[category])
+
+        if not gap_found:
+            st.success(
+                "🎉 No skill gaps detected! "
+                "Your resume matches all detected skills."
+            )
+        st.subheader("📈 ATS Score Improvement Suggestions")
+
+        all_missing_skills = (
+            results["required_missing"]
+            + results["preferred_missing"]
+        )
+
+        for skill in all_missing_skills:
+            tip = SKILL_IMPROVEMENT_TIPS.get(
+                skill,
+                f"Learn {skill} and add genuine evidence of it to your resume."
+            )
+
+            st.info(f"💡 **{skill.title()}:** {tip}")
+        st.subheader("🚀 Personalized Recommendations")
+
+        for skill in results["required_missing"]:
+            st.warning(
+                f"Required: Improve or add evidence for **{skill}**."
+            )
+
+        for skill in results["preferred_missing"]:
+            st.info(
+                f"Preferred: Consider learning **{skill}** "
+                "for an additional advantage."
+            )
+        st.divider()
+        st.subheader("🗺️ Your Personalized Learning Roadmap")
+
+        roadmap_found = False
+
+        for category, skills in SKILL_GROUPS.items():
+            category_gaps = [
+                skill for skill in skills
+                if skill in missing_skills
+            ]
+
+            if category_gaps and category in LEARNING_ROADMAP:
+                roadmap_found = True
+                roadmap = LEARNING_ROADMAP[category]
+
+                with st.expander(
+                    f"📚 {category} | {roadmap['duration']}"
+                ):
+                    st.write("**What you should learn:**")
+
+                    for topic in roadmap["topics"]:
+                        st.write(f"📌 {topic}")
+
+                    st.success(
+                        f"🎯 Practice Task: {roadmap['task']}"
+                    )
+
+        if not roadmap_found:
+            st.success(
+                "🎉 Great! No learning gaps found. "
+                "Keep improving your skills!"
+            )
+        st.caption(
+            "This is a weighted keyword-based estimate, "
+            "not an official ATS score or hiring prediction."
+        )
+        pdf_report = generate_pdf_report(results)
+
+        st.download_button(
+            label="📥 Download Analysis Report",
+            data=pdf_report,
+            file_name="JobMate_AI_Analysis_Report.pdf",
+            mime="application/pdf"
+        )
+
 # Resume Builder
 elif page == "Resume Builder":
     st.title("📝 Professional Resume Builder")
