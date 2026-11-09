@@ -7,6 +7,15 @@ from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
+import json
+from openai import (
+    OpenAI,
+    AuthenticationError,
+    RateLimitError,
+    APITimeoutError,
+    APIConnectionError,
+)
+
 st.set_page_config(
     page_title="JobMate AI",
     page_icon="💼",
@@ -240,7 +249,64 @@ def extract_resume(uploaded_file):
     for page in reader.pages:
         text += (page.extract_text() or "") + "\n"
     return text
+def extract_soft_skills(text):
+    text = text.lower()
 
+    soft_skill_patterns = {
+        "communication": [
+            r"\bcommunication\b",
+            r"\bcommunicated\b",
+            r"\bcommunicating\b",
+            r"\binterpersonal skills\b",
+            r"\bdaily stand[- ]ups?\b",
+            r"\bteam meetings\b",
+            r"\bshared project updates\b"
+        ],
+        "teamwork": [
+            r"\bteamwork\b",
+            r"\bteam work\b",
+            r"\bteam player\b",
+            r"\bteammates?\b",
+            r"\bcollaborat(?:e|ed|es|ing|ion|ive)\b",
+            r"\bworked with (?:a |the )?team\b"
+        ],
+        "problem solving": [
+            r"\bproblem[- ]solving\b",
+            r"\btroubleshoot(?:ing|ed)?\b",
+            r"\bresolved technical issues\b",
+            r"\bsolved technical problems\b"
+        ],
+        "leadership": [
+            r"\bled a team\b",
+            r"\bmentored\b",
+            r"\bguided (?:a |the )?team\b"
+        ],
+        "time management": [
+            r"\btime management\b",
+            r"\bprioritized tasks\b",
+            r"\bmanaged deadlines\b"
+        ],
+        "critical thinking": [
+            r"\bcritical thinking\b",
+            r"\broot cause analysis\b"
+        ],
+        "analytical skills": [
+            r"\banalytical skills\b",
+            r"\banalytical thinking\b"
+        ],
+        "attention to detail": [
+            r"\battention to detail\b",
+            r"\bdetail[- ]oriented\b"
+        ]
+    }
+
+    detected = set()
+
+    for skill, patterns in soft_skill_patterns.items():
+        if any(re.search(pattern, text) for pattern in patterns):
+            detected.add(skill)
+
+    return detected
 def extract_skills(text):
     text = text.lower()
     return [skill for skill in SKILLS if
@@ -256,6 +322,7 @@ SOFT_SKILLS = [
 
 def analyze_resume(resume, job_description):
     resume_skills = set(extract_skills(resume))
+    resume_skills.update(extract_soft_skills(resume))
     jd = job_description.lower()
 
     preferred_pattern = (
@@ -273,9 +340,12 @@ def analyze_resume(resume, job_description):
         preferred_text = ""
 
     required_skills = set(extract_skills(required_text))
+    required_skills.update(extract_soft_skills(required_text))
+
     preferred_skills = (
-        set(extract_skills(preferred_text)) - required_skills
-    )
+        set(extract_skills(preferred_text))
+        | extract_soft_skills(preferred_text)
+    ) - required_skills
 
     soft_set = set(SOFT_SKILLS)
 
@@ -327,8 +397,219 @@ def analyze_resume(resume, job_description):
         "soft_score": percentage(soft_matched, soft_total),
         "jd_skills_found": bool(required_skills or preferred_skills),
         "technical_applicable": bool(technical_total),
-        "soft_applicable": bool(soft_total)
+        "soft_applicable": bool(soft_total),
+        "resume_skills": sorted(resume_skills)
     }
+
+AI_MODEL = "qwen-3.8-27b"
+AI_BASE_URL = "https://bharatcode.ai/api/model/v1"
+AI_TIMEOUT_SECONDS = 60
+AI_JD_MAX_CHARS = 4000
+
+
+def get_ai_api_key():
+    try:
+        secrets = st.secrets
+        if "BHARATCODE_API_KEY" not in secrets:
+            return None, (
+                "AI features are not configured. Add BHARATCODE_API_KEY "
+                "to .streamlit/secrets.toml."
+            )
+        key = secrets["BHARATCODE_API_KEY"]
+        if not isinstance(key, str) or not key.strip():
+            return None, (
+                "BHARATCODE_API_KEY is missing or invalid in "
+                ".streamlit/secrets.toml."
+            )
+        return key.strip(), None
+    except Exception:
+        return (
+            None,
+            "AI configuration could not be loaded. Check that "
+            ".streamlit/secrets.toml exists and contains "
+            "BHARATCODE_API_KEY.",
+        )
+
+
+def build_ai_prompt_data(results, job_description):
+    return {
+        "job_description": job_description[:AI_JD_MAX_CHARS],
+        "resume_skills": results.get("resume_skills", [])[:40],
+        "required_matched": results.get("required_matched", []),
+        "required_missing": results.get("required_missing", []),
+        "preferred_matched": results.get("preferred_matched", []),
+        "preferred_missing": results.get("preferred_missing", []),
+        "overall_match_percent": results.get("score"),
+        "technical_percent": results.get("technical_score"),
+        "soft_skills_percent": results.get("soft_score"),
+    }
+
+
+def call_bharatcode(results, job_description):
+    api_key, key_error = get_ai_api_key()
+    if api_key is None:
+        return ("error", key_error)
+
+    try:
+        client = OpenAI(
+            api_key=api_key,
+            base_url=AI_BASE_URL,
+            timeout=AI_TIMEOUT_SECONDS,
+            max_retries=0,
+        )
+    except Exception:
+        return (
+            "error",
+            "Could not initialize the AI client. "
+            "Check the BHARATCODE_API_KEY configuration.",
+        )
+
+    system_msg = (
+        "Career coach. Reply ONLY with JSON: {\"summary\": string, "
+        '"resume_improvements": [<=4 short strings], '
+        '"skill_focus": [<=4 strings], "interview_talking_points": '
+        "[<=3 short strings]}. Be specific, ATS-friendly; never "
+        "invent personal details."
+    )
+    user_msg = (
+        "Here is the analysis data (JSON):\n"
+        + json.dumps(build_ai_prompt_data(results, job_description),
+                     ensure_ascii=False)
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model=AI_MODEL,
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.4,
+            max_tokens=1500,
+        )
+    except AuthenticationError:
+        return ("error", "Authentication failed. Check BHARATCODE_API_KEY.")
+    except RateLimitError:
+        return ("error", "Rate limit reached. Wait a minute and try again.")
+    except APITimeoutError:
+        return ("error", "The AI request timed out. Please try again.")
+    except APIConnectionError:
+        return (
+            "error",
+            "Could not reach the BharatCode API. Check your connection.",
+        )
+    except Exception:
+        return ("error", "Unexpected AI error. The analysis above is unaffected.")
+
+    if not getattr(response, "choices", None):
+        return ("error", "The AI returned no response. Please try again.")
+
+    content = response.choices[0].message.content or ""
+    content = content.strip()
+    if not content:
+        return ("error", "The AI returned an empty response. Please try again.")
+
+    return ("ok", content)
+
+
+def parse_ai_response(raw_text):
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        parts = cleaned.split("```")
+        cleaned = (parts[1] if len(parts) > 2 else cleaned).strip()
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:].strip()
+    try:
+        data = json.loads(cleaned)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
+def render_ai_suggestions(results, job_description):
+    st.subheader("🤖 AI-Powered Personalized Resume Suggestions")
+
+    st.markdown(
+        "**Privacy notice:** To generate suggestions, the Job "
+        "Description (up to 4000 characters), your detected resume "
+        "skills, and your skill-match scores will be sent to "
+        "BharatCode's external AI API. **Your full resume, name, "
+        "email, phone, education and work history will NOT be sent.**"
+    )
+    consent_given = st.checkbox(
+        "I consent to sending the data described above "
+        "to BharatCode's external API.",
+        key="ai_data_consent",
+    )
+
+    if st.button("✨ Generate AI Suggestions", key="ai_suggestions_btn"):
+        if not consent_given:
+            st.warning(
+                "Please tick the consent checkbox above before "
+                "generating AI suggestions."
+            )
+        else:
+            with st.spinner("Asking BharatCode AI for suggestions..."):
+                status, payload = call_bharatcode(results, job_description)
+            if status == "ok":
+                st.session_state["ai_suggestions"] = {
+                    "parsed": parse_ai_response(payload),
+                    "raw": payload,
+                }
+            else:
+                st.session_state["ai_suggestions"] = None
+                st.error(payload)
+
+    cached = st.session_state.get("ai_suggestions")
+    if not cached:
+        st.caption(
+            "Click 'Generate AI Suggestions' for personalized feedback "
+            "from BharatCode AI."
+        )
+        return
+
+    data = cached.get("parsed")
+    if data is None:
+        st.warning("The AI response could not be parsed. Raw output below.")
+        with st.expander("Raw AI response"):
+            st.text(cached.get("raw", ""))
+        return
+
+    if not data:
+        st.info("The AI returned no usable content. Try again.")
+        return
+
+    summary = data.get("summary")
+    if isinstance(summary, str) and summary.strip():
+        st.info(summary.strip())
+
+    improvements = data.get("resume_improvements")
+    if isinstance(improvements, list):
+        lines = [i for i in improvements if isinstance(i, str) and i.strip()]
+        if lines:
+            st.markdown("**Resume improvements:**")
+            for item in lines:
+                st.write(f"• {item.strip()}")
+
+    skill_focus = data.get("skill_focus")
+    if isinstance(skill_focus, list):
+        skills = [s for s in skill_focus
+                  if isinstance(s, str) and s.strip()]
+        if skills:
+            st.markdown("**Skill focus:**")
+            st.write(", ".join(s.strip() for s in skills))
+
+    interview = data.get("interview_talking_points")
+    if isinstance(interview, list):
+        points = [p for p in interview if isinstance(p, str) and p.strip()]
+        if points:
+            st.markdown("**Interview talking points:**")
+            for item in points:
+                st.write(f"• {item.strip()}")
+
+
 SKILL_GROUPS = {
     "Testing Fundamentals": [
         "manual testing", "software testing", "functional testing",
@@ -569,6 +850,7 @@ elif page == "Resume Analyzer":
     )
 
     st.session_state.setdefault("analyzer_results", None)
+    st.session_state.setdefault("ai_suggestions", None)
 
     if st.button("Analyze My Resume", type="primary"):
         if uploaded_file is None:
@@ -590,6 +872,7 @@ elif page == "Resume Analyzer":
                             resume_text, job_description
                         )
                         st.session_state["analyzer_results"] = results
+                        st.session_state["ai_suggestions"] = None
 
             except Exception as e:
                 st.error(f"Something went wrong: {e}")
@@ -701,6 +984,10 @@ elif page == "Resume Analyzer":
                 f"Preferred: Consider learning **{skill}** "
                 "for an additional advantage."
             )
+        try:
+            render_ai_suggestions(results, job_description)
+        except Exception:
+            st.caption("AI suggestions are unavailable right now.")
         st.divider()
         st.subheader("🗺️ Your Personalized Learning Roadmap")
 
