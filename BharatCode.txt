@@ -1,0 +1,272 @@
+BHARATCODE BUILD LEAGUE 2026 — SUBMISSION
+==========================================
+
+1. PROJECT NAME AND HACKATHON NAME
+----------------------------------
+Project Name : JobMate AI
+Hackathon    : BharatCode Build League 2026
+Tagline      : An explainable hybrid Resume Analyzer and Career
+               Assistant, combining deterministic skill matching
+               with optional BharatCode AI-powered guidance.
+
+
+2. PROBLEM STATEMENT
+--------------------
+Job seekers send resumes into an automated funnel. Applicant
+Tracking Systems (ATS) filter resumes by keyword matching long
+before a human reads them. Many candidates never learn WHY their
+applications fail: they do not know which skills a specific job
+description requires, which of those skills are missing from
+their resume, or what to learn next.
+
+The result is wasted applications, unclear rejection reasons, and
+no clear path for improvement — especially for early-career
+candidates and fresh graduates who have never been taught how ATS
+screening works.
+
+JobMate AI addresses exactly this gap: it turns a job description
+and a PDF resume into clear, actionable feedback in minutes.
+
+
+3. PROPOSED SOLUTION
+--------------------
+JobMate AI is a five-page Streamlit application that converts a
+resume (PDF) and a target job description (JD) into structured,
+prioritized guidance:
+
+  1. Detect the skills the JD requires, separating "required"
+     from "preferred" qualifications.
+  2. Score the resume against them with a weighted, explainable
+     match percentage (required skills carry 3x weight).
+  3. Show the gaps — matched and missing skills grouped by
+     category, with improvement tips.
+  4. Recommend what to do next — a personalized learning
+     roadmap, skill-based job role suggestions, and a
+     downloadable PDF analysis report.
+  5. Optionally, ask BharatCode's AI (qwen-3.8-27b) for
+     personalized resume suggestions — only after the user
+     gives explicit consent.
+
+The deterministic analysis engine requires no external AI API
+call and can run locally without internet once dependencies are
+installed.
+
+
+4. KEY FEATURES
+---------------
+Five-page navigation from the sidebar:
+
+  * Dashboard — welcome page and overview of the tools.
+
+  * Resume Analyzer — the core engine:
+      - Overall Match, Technical Score, and Soft Skills Score
+        against the pasted job description.
+      - Required vs. preferred skills, each shown as matched
+        and missing lists.
+      - Smart Skill Gap Analysis: missing skills grouped into
+        categories (Testing Fundamentals, Testing Tools,
+        Programming & Web, Databases, Cloud & DevOps,
+        Data & AI, Soft Skills) with tailored improvement tips.
+      - ATS Score Improvement Suggestions per missing skill.
+      - Personalized Recommendations prioritizing required
+        gaps before preferred gaps.
+      - Personalized Learning Roadmap with duration, topics,
+        and a hands-on practice task per gap category.
+      - Downloadable PDF analysis report.
+      - AI-Powered Personalized Resume Suggestions (optional,
+        consent-gated).
+
+  * Resume Builder — fill-in form that generates and downloads
+    a professional PDF resume (Modern or Minimal
+    template).
+
+  * Job Recommendations — uploads a resume and ranks job roles
+    by detected-skill match, showing matched and missing skills
+    per role.
+
+  * About — project overview and technology stack.
+
+Additional qualities:
+  * Analysis results persist across Streamlit reruns
+    (st.session_state), so results do not disappear when the
+    user interacts with the page.
+  * Clear handling of edge cases: N/A scores when a JD has no
+    recognized skills, warnings instead of misleading 0%
+    values, and graceful degradation when the AI is not
+    configured.
+
+
+5. HOW THE APPLICATION WORKS
+----------------------------
+Resume Analyzer flow:
+  1. User uploads a text-based PDF resume and pastes a job
+     description.
+  2. pypdf extracts the resume text; a word-boundary regex
+     engine matches it against a built-in dictionary of ~60
+     skills (programming, testing, databases, cloud, data/AI,
+     soft skills) plus curated soft-skill pattern lists.
+  3. The JD is split at the first preferred-qualifications
+     heading into required and preferred pools; both pools are
+     matched the same way.
+  4. Scores are computed: weighted overall match (required x3,
+     preferred x1), technical score, and soft-skills score.
+     Gap analysis, tips, roadmap, and role recommendations are
+     derived from the same matched/missing sets.
+  5. Results are stored in st.session_state and rendered; a
+     PDF report can be downloaded.
+
+AI suggestions flow (optional):
+  1. A privacy notice and a consent checkbox are shown. The AI
+     is NEVER called until consent is given.
+  2. The app builds a small JSON payload: truncated JD (first
+     4000 characters), detected resume skills (up to 40),
+     matched/missing skill lists, and the three scores.
+  3. The payload is sent to BharatCode's OpenAI-compatible API
+     (model qwen-3.8-27b).
+  4. The model must reply with a JSON object containing
+     summary, resume_improvements, skill_focus, and
+     interview_talking_points.
+  5. The response is parsed; if parsing fails, the raw output
+     is shown safely in a collapsible expander instead of
+     crashing. Suggestions persist in session state for the
+     active session.
+
+Resume Builder flow: form input -> ReportLab PDF generation ->
+in-memory download. Job Recommendations flow: PDF upload ->
+skill extraction -> role score comparison.
+
+
+6. TECHNOLOGY STACK
+-------------------
+  Web framework     : Python + Streamlit
+  PDF parsing       : pypdf
+  PDF generation    : ReportLab
+  AI integration    : openai Python SDK -> BharatCode API
+  Skill matching    : Custom keyword/regex matching engine
+  State management  : st.session_state
+  Secrets           : Streamlit secrets (gitignored file)
+  Dependency mgmt   : requirements.txt (pinned versions)
+  Dev environment   : venv + optional Dev Container / Codespaces
+
+Architecture: a single-file Streamlit application (app.py,
+~1250 lines). The sidebar radio selects one of five pages. The
+deterministic scoring engine and the consent-gated AI layer are
+fully separated — the app remains useful with zero configuration.
+
+
+7. BHARATCODE AI INTEGRATION AND ITS ROLE
+-----------------------------------------
+Integration settings:
+  Model       : qwen-3.8-27b
+  Endpoint    : https://bharatcode.ai/api/model/v1
+  SDK         : Official OpenAI Python SDK (compatible API)
+  Timeout     : 60 seconds per request
+  Retries     : disabled (max_retries=0) — failures surface
+                immediately instead of silently retrying
+  Temperature : 0.4
+  Max tokens  : 1500
+
+Role of the AI in JobMate AI:
+  * The keyword engine tells users WHAT is missing; BharatCode
+    AI tells them HOW to act on it — a plain-language summary,
+    concrete resume improvements, skill focus areas, and
+    interview talking points.
+  * Strict JSON contract (four fields) keeps output structured,
+    renderable, and safe; a fallback path handles malformed
+    responses without crashing the app.
+  * The key is read ONLY from Streamlit secrets
+    (BHARATCODE_API_KEY); it is never hardcoded, logged, or
+    displayed. The app runs without a key — AI is an optional
+    enhancement.
+
+
+8. PRIVACY AND SECURITY MEASURES
+--------------------------------
+  * Data sent to the BharatCode API (only after consent):
+      - Job description (first 4000 characters)
+      - Detected resume skills (up to 40)
+      - Matched/missing skill lists and the three scores
+  * Data from the uploaded resume that is NOT included in the
+    API payload:
+      - Full resume text, name, email, phone, location
+      - Education, work history, projects, uploaded files
+  * Personal identifiers: the app does not intentionally
+    extract or send personal identifiers from the uploaded
+    resume. However, the first 4000 characters of the pasted
+    job description are sent after consent, so users should
+    avoid including personal or confidential information in
+    that text.
+  * Mandatory consent: a privacy disclosure is shown above a
+    consent checkbox; the API is never called without it.
+  * API key handling: read only via st.secrets; the real
+    secrets file (.streamlit/secrets.toml) is gitignored and
+    was never committed (verified against full git history).
+    A placeholder file (secrets.toml.example) documents the
+    expected configuration.
+  * Error handling: dedicated handling for authentication,
+    rate limit, timeout, connection, and empty-response
+    failures — all shown as friendly messages, never exposing
+    keys or stack traces.
+  * Hosting transparency: resume processing happens in the
+    environment hosting the app (local machine or Streamlit
+    Cloud); suggestions are retained in Streamlit session
+    state for the duration of the active session only.
+
+
+9. INNOVATION AND PRACTICAL IMPACT
+----------------------------------
+  * Hybrid design: a transparent, offline, explainable
+    keyword-scoring core combined with an optional
+    consent-gated LLM layer. Users always see the
+    deterministic score, so AI output is a supplement —
+    not a black box.
+  * Privacy-first AI: data minimization (limited job-description
+    text, detected skills and scores; never raw resumes) plus
+    explicit consent builds user trust and is documented
+    end-to-end in the README.
+  * Practical, end-to-end career workflow: analyze a resume
+    -> see gaps -> learn from a roadmap -> get AI advice ->
+    build a new resume PDF -> discover matching job roles —
+    all in one app.
+  * Honest UX: edge cases are handled explicitly (N/A when no
+    JD skills are found, warnings instead of false 0% scores,
+    AI-unavailable fallbacks), and every scoring section is
+    labeled as an estimate rather than an official ATS verdict.
+  * Immediate usefulness for freshers and career switchers who
+    need concrete, prioritized next steps instead of generic
+    advice.
+
+
+10. LIMITATIONS AND FUTURE SCOPE
+--------------------------------
+Limitations (transparently disclosed in the README):
+  * Skill matching uses a fixed dictionary of ~60 keywords and
+    curated soft-skill patterns — not semantic/NLP matching;
+    synonyms outside the dictionary are not detected.
+  * Scores are keyword-based estimates, not official ATS
+    scores, and do not guarantee interviews or selection.
+  * Only text-based PDFs are parsed (no OCR for scanned
+    resumes).
+  * The required/preferred JD split relies on the first
+    preferred-qualifications heading; unusual JD layouts may
+    split imperfectly.
+  * AI suggestions are generated from skills and scores only
+    (not full resume wording), so advice is necessarily
+    coarse, and outputs should be reviewed before use.
+
+Future scope:
+  * OCR support for scanned resumes.
+  * Broader skill taxonomy and synonym/semantic matching.
+  * Per-role AI interview preparation and cover-letter drafts.
+  * Saved multi-job application tracking dashboard.
+  * Feedback loop to personalize roadmaps over time.
+
+
+11. GITHUB REPOSITORY URL
+-------------------------
+https://github.com/abhishekpal8146/JobMate-AI
+
+
+12. LIVE DEMO URL
+-----------------
+https://jobmate-ai-abhishek.streamlit.app
