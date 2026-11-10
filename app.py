@@ -486,6 +486,7 @@ def call_bharatcode(results, job_description):
             ],
             temperature=0.4,
             max_tokens=1500,
+            reasoning_effort="none",
         )
     except AuthenticationError:
         return ("error", "Authentication failed. Check BHARATCODE_API_KEY.")
